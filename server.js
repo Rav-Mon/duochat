@@ -8,7 +8,9 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: '*' } });
 
-const PORT = 3000;
+// server.js  (root folder)
+const PORT = process.env.PORT || 3000;   // <-- important for Render / any host
+// … the rest of the file stays exactly the same as before …
 const MESSAGES_FILE = path.join(__dirname, 'messages.json');
 const PROFILES_FILE = path.join(__dirname, 'profiles.json');
 
@@ -128,4 +130,5 @@ app.post('/upload', (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+
 });
