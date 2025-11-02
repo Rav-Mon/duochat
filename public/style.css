@@ -1,23 +1,349 @@
-body { font-family: Arial, sans-serif; margin: 0; background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; }
-.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.login-box, .call-box { background: #075e54; padding: 20px; border-radius: 10px; text-align: center; }
-.login-box button { display: block; margin: 10px auto; padding: 10px; background: #25d366; color: #000; border: none; border-radius: 5px; cursor: pointer; }
-.hidden { display: none; }
-#app { display: flex; flex-direction: column; height: 100vh; }
-header { background: #075e54; padding: 10px; display: flex; align-items: center; justify-content: space-between; }
-.profile-pic { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; }
-.call-buttons button { background: #25d366; color: #000; border: none; padding: 5px 10px; margin-left: 5px; border-radius: 5px; cursor: pointer; }
-.messages { flex: 1; overflow-y: auto; padding: 10px; background: #e5ddd5; }
-.message { margin: 10px 0; padding: 10px; border-radius: 10px; max-width: 70%; position: relative; }
-.message.sent { background: #dcf8c6; align-self: flex-end; margin-left: auto; }
-.message.received { background: #fff; align-self: flex-start; }
-.timestamp { font-size: 0.8em; color: #666; }
-.delete-btn { position: absolute; top: 5px; right: 5px; background: red; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 0.8em; }
-footer { display: flex; padding: 10px; background: #f0f0f0; align-items: center; }
-footer input[type="text"] { flex: 1; padding: 10px; border: none; border-radius: 20px; margin-right: 10px; }
-footer button { padding: 10px 15px; background: #25d366; color: #000; border: none; border-radius: 20px; cursor: pointer; }
+/* ==============================================
+   WhatsApp Duo – Clean, Modern, Mobile-First
+   ============================================== */
 
-/* Call Overlay */
-#call-overlay .call-box { display: flex; flex-direction: column; align-items: center; }
-#local-video, #remote-video { width: 300px; height: 200px; background: #000; margin: 10px; border-radius: 10px; }
-#call-status { margin: 10px; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #0b141a;
+  color: #e9edef;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============== OVERLAYS =============== */
+.overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.hidden { display: none !important; }
+
+/* =============== LOGIN BOX =============== */
+.login-box {
+  background: #111b21;
+  padding: 30px 25px;
+  border-radius: 12px;
+  text-align: center;
+  width: 90%;
+  max-width: 320px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.login-box h2 {
+  margin-bottom: 20px;
+  color: #00bfa5;
+  font-size: 1.4rem;
+}
+
+.login-box button {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 14px;
+  background: #00bfa5;
+  color: #111;
+  font-weight: bold;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.login-box button:hover {
+  background: #00a18a;
+}
+
+/* =============== MAIN APP =============== */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #111b21;
+}
+
+/* ------------- HEADER ------------- */
+header {
+  background: #1f2c34;
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2a3942;
+  position: relative;
+}
+
+.profile-label {
+  cursor: pointer;
+  margin-right: 12px;
+}
+
+.profile-pic {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #00bfa5;
+  transition: transform 0.2s;
+}
+
+.profile-label:hover .profile-pic {
+  transform: scale(1.08);
+}
+
+.peer-info {
+  flex: 1;
+  margin-left: 8px;
+}
+
+.peer-info h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #e9edef;
+  font-weight: 500;
+}
+
+.online-status {
+  font-size: 0.75rem;
+  color: #00bfa5;
+  opacity: 0.9;
+}
+
+/* Call Buttons – Icons Only */
+.call-buttons button {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #aebac1;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.call-buttons button:hover {
+  background: rgba(255,255,255,0.1);
+  color: #00bfa5;
+}
+
+/* =============== MESSAGES AREA =============== */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 8px;
+  background: #0b141a;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect fill="%23111b21" width="100" height="100"/><path fill="%230b141a" d="M0,50 Q25,30 50,50 T100,50 Q75,70 50,50 T0,50Z"/></svg>');
+  background-size: 200px;
+}
+
+.message {
+  max-width: 75%;
+  margin: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  position: relative;
+  word-wrap: break-word;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  animation: fadeIn 0.3s ease;
+}
+
+.message.sent {
+  background: #005c4b;
+  color: #e9edef;
+  align-self: flex-end;
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+
+.message.received {
+  background: #202c33;
+  color: #e9edef;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.timestamp {
+  font-size: 0.7rem;
+  color: rgba(233, 237, 239, 0.6);
+  margin-top: 4px;
+  display: block;
+  text-align: right;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: rgba(255,0,0,0.7);
+  color: white;
+  border: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.message:hover .delete-btn {
+  opacity: 1;
+}
+
+/* =============== INPUT FOOTER =============== */
+footer {
+  display: flex;
+  padding: 10px;
+  background: #1f2c34;
+  border-top: 1px solid #2a3942;
+  align-items: center;
+}
+
+#message-input {
+  flex: 1;
+  padding: 12px 16px;
+  background: #2a3942;
+  color: #e9edef;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  outline: none;
+}
+
+#message-input::placeholder {
+  color: #8696a0;
+}
+
+footer button {
+  margin-left: 10px;
+  background: #00bfa5;
+  color: #111;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+footer button:hover {
+  background: #00a18a;
+}
+
+/* =============== CALL OVERLAY =============== */
+#call-overlay .call-box {
+  background: #111b21;
+  padding: 25px;
+  border-radius: 16px;
+  text-align: center;
+  width: 90%;
+  max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+#call-info {
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #00bfa5;
+}
+
+#local-video, #remote-video {
+  width: 100%;
+  max-width: 300px;
+  height: 200px;
+  background: #000;
+  border-radius: 12px;
+  margin: 10px auto;
+  object-fit: cover;
+  display: block;
+}
+
+#incoming-controls {
+  margin: 16px 0;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+#incoming-controls button {
+  flex: 1;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+#accept-call {
+  background: #00bfa5;
+  color: #111;
+}
+
+#decline-call {
+  background: #e74c3c;
+  color: white;
+}
+
+#incoming-controls button:active {
+  transform: scale(0.95);
+}
+
+#end-call {
+  margin-top: 16px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: none;
+}
+
+/* =============== ANIMATIONS =============== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =============== SCROLLBAR (Webkit) =============== */
+.messages::-webkit-scrollbar {
+  width: 6px;
+}
+.messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.messages::-webkit-scrollbar-thumb {
+  background: #2a3942;
+  border-radius: 3px;
+}
+
+/* =============== RESPONSIVE =============== */
+@media (max-width: 480px) {
+  .call-buttons button { font-size: 1.3rem; padding: 4px; }
+  .profile-pic { width: 38px; height: 38px; }
+  .peer-info h2 { font-size: 1.1rem; }
+}
