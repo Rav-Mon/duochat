@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Duo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login Overlay -->
+  <div id="login-overlay" class="overlay">
+    <div class="login-box">
+      <h2>Login</h2>
+      <button onclick="login('mango1')">Mango1</button>
+      <button onclick="login('mango2')">Mango2</button>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app" class="hidden">
+    <header>
+      <img id="peer-pic" src="" alt="Peer Pic" class="profile-pic">
+      <h2 id="peer-name">Connecting...</h2>
+      <div class="call-buttons">
+        <button id="voice-call" onclick="startCall('voice')">📞 Voice</button>
+        <button id="video-call" onclick="startCall('video')">📹 Video</button>
+      </div>
+    </header>
+
+    <div id="messages" class="messages"></div>
+
+    <footer>
+      <input type="file" id="profile-upload" accept="image/*" style="display:none" onchange="uploadProfile()">
+      <button onclick="document.getElementById('profile-upload').click()">👤 Set Profile Pic</button>
+      <input type="text" id="message-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+      <button onclick="sendMessage()">Send</button>
+    </footer>
+  </div>
+
+  <!-- Call UI -->
+  <div id="call-overlay" class="overlay hidden">
+    <div class="call-box">
+      <video id="local-video" autoplay muted playsinline></video>
+      <video id="remote-video" autoplay playsinline></video>
+      <button id="end-call" onclick="endCall()">End Call</button>
+      <p id="call-status">Ringing...</p>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
