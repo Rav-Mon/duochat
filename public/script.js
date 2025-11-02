@@ -1,195 +1,191 @@
-const socket = io();
+/* ================== GLOBALS ================== */
+const socket = io();                 // will auto-connect to the same origin
 let currentUser = null;
-let peerUser = null;
-let messages = [];
-let profiles = {};
+let peerUser    = null;
+let messages    = [];
+let profiles    = {};
+
 let localStream = null;
-let remoteStream = null;
 let peerConnection = null;
 let isCaller = false;
-let callType = null; // 'voice' or 'video'
+let pendingOffer = null;   // for incoming call
 
-// Login
+/* ================== LOGIN ================== */
 function login(user) {
   currentUser = user;
-  peerUser = user === 'mango1' ? 'mango2' : 'mango1';
+  peerUser    = user === 'mango1' ? 'mango2' : 'mango1';
+
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
+
   document.getElementById('peer-name').textContent = peerUser;
   socket.emit('join', user);
 }
 
-// Load data from server
-socket.on('load_messages', (loadedMessages) => {
-  messages = loadedMessages;
+/* ================== SOCKET LISTENERS ================== */
+socket.on('load_messages', msgs => { messages = msgs; renderMessages(); });
+socket.on('load_profiles', p => { profiles = p; updatePeerPic(); });
+
+socket.on('new_message', msg => { messages.push(msg); renderMessages(); });
+socket.on('message_deleted', id => {
+  const idx = messages.findIndex(m => m.id === id);
+  if (idx > -1) messages[idx].deleted = true;
   renderMessages();
 });
 
-socket.on('load_profiles', (loadedProfiles) => {
-  profiles = loadedProfiles;
-  updateProfilePic(currentUser, profiles[currentUser]?.pic);
-  updatePeerPic();
+socket.on('profile_updated', ({user, pic}) => {
+  profiles[user] = {pic};
+  if (user !== currentUser) updatePeerPic();
 });
 
-socket.on('new_message', (msg) => {
-  messages.push(msg);
-  renderMessages();
+socket.on('user_online', u => {
+  document.getElementById('online-status').textContent = '(Online)';
+});
+socket.on('user_offline', () => {
+  document.getElementById('online-status').textContent = '';
 });
 
-socket.on('message_deleted', (msgId) => {
-  const msgIndex = messages.findIndex(m => m.id === msgId);
-  if (msgIndex !== -1) messages[msgIndex].deleted = true;
-  renderMessages();
-});
-
-socket.on('profile_updated', (data) => {
-  profiles[data.user] = { ...profiles[data.user], pic: data.pic };
-  if (data.user === currentUser) updateProfilePic(currentUser, data.pic);
-  else updatePeerPic();
-});
-
-socket.on('user_online', (user) => {
-  document.getElementById('peer-name').textContent = `${user} (Online)`;
-});
-
-// Send message
+/* ================== MESSAGING ================== */
 function sendMessage() {
-  const input = document.getElementById('message-input');
-  const text = input.value.trim();
-  if (!text) return;
-  socket.emit('send_message', { text });
-  input.value = '';
+  const inp = document.getElementById('message-input');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  socket.emit('send_message', {text: txt});
+  inp.value = '';
 }
+function deleteMessage(id) { socket.emit('delete_message', id); }
 
-// Render messages
 function renderMessages() {
   const container = document.getElementById('messages');
   container.innerHTML = '';
-  messages.forEach(msg => {
-    if (msg.deleted) return; // Skip deleted
+  messages.forEach(m => {
+    if (m.deleted) return;
     const div = document.createElement('div');
-    div.className = `message ${msg.from === currentUser ? 'sent' : 'received'}`;
-    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    div.className = `message ${m.from===currentUser?'sent':'received'}`;
+    const time = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     div.innerHTML = `
-      <p>${msg.text}</p>
+      <p>${escapeHtml(m.text)}</p>
       <span class="timestamp">${time}</span>
-      ${msg.from === currentUser ? `<button class="delete-btn" onclick="deleteMessage(${msg.id})">×</button>` : ''}
+      ${m.from===currentUser ? `<button class="delete-btn" onclick="deleteMessage(${m.id})">×</button>` : ''}
     `;
     container.appendChild(div);
   });
   container.scrollTop = container.scrollHeight;
 }
+function escapeHtml(s){return s.replace(/[&<>"']/g,m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);}
 
-function deleteMessage(msgId) {
-  socket.emit('delete_message', msgId);
+/* ================== PROFILE PIC (clickable) ================== */
+function updatePeerPic() {
+  const img = document.getElementById('peer-pic');
+  img.src = profiles[peerUser]?.pic || 'https://via.placeholder.com/40?text=?';
 }
-
-// Profile upload
-function uploadProfile() {
-  const file = document.getElementById('profile-upload').files[0];
+function uploadProfile(file) {
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = (e) => {
-    const pic = e.target.result; // Base64
-    socket.emit('upload_profile', { pic });
-  };
+  reader.onload = e => socket.emit('upload_profile', {pic: e.target.result});
   reader.readAsDataURL(file);
 }
 
-function updateProfilePic(user, pic) {
-  // For simplicity, set in header if needed; peer pic updates below
-}
-
-function updatePeerPic() {
-  const img = document.getElementById('peer-pic');
-  img.src = profiles[peerUser]?.pic || 'https://via.placeholder.com/40?text=?'; // Default placeholder
-}
-
-// WebRTC Calls
-const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }; // Free STUN
+/* ================== CALL LOGIC ================== */
+const rtcConfig = {iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
 
 function startCall(type) {
-  callType = type;
   isCaller = true;
-  document.getElementById('call-overlay').classList.remove('hidden');
-  document.getElementById('call-status').textContent = 'Ringing...';
-  initLocalStream(type);
+  pendingOffer = null;
+  showCallOverlay(`${type === 'video' ? 'Video' : 'Voice'} Calling…`);
+  initLocalStream(type).then(() => createOffer());
 }
-
-socket.on('incoming_call', async ({ from, offer }) => {
-  peerUser = from;
-  isCaller = false;
-  callType = 'video'; // Assume video for incoming; adjust if needed
-  document.getElementById('call-overlay').classList.remove('hidden');
-  document.getElementById('call-status').textContent = 'Incoming call...';
-  initLocalStream(callType);
-  await handleOffer(offer);
-});
 
 async function initLocalStream(type) {
-  try {
-    const constraints = type === 'video' ? { video: true, audio: true } : { audio: true };
-    localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    document.getElementById('local-video').srcObject = localStream;
-    peerConnection = new RTCPeerConnection(config);
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-    peerConnection.onicecandidate = (e) => {
-      if (e.candidate) socket.emit('ice_candidate', e.candidate);
-    };
-
-    peerConnection.ontrack = (e) => {
-      remoteStream = e.streams[0];
-      document.getElementById('remote-video').srcObject = remoteStream;
-    };
-
-    if (isCaller) {
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      socket.emit('call_offer', offer);
-    }
-  } catch (err) {
-    console.error('Media error:', err);
-  }
+  const constraints = type === 'video' ? {video:true,audio:true} : {audio:true};
+  localStream = await navigator.mediaDevices.getUserMedia(constraints);
+  document.getElementById('local-video').srcObject = localStream;
+  // hide video element for voice-only
+  document.getElementById('local-video').style.display = type==='video' ? 'block' : 'none';
+  document.getElementById('remote-video').style.display = type==='video' ? 'block' : 'none';
 }
 
-async function handleOffer(offer) {
+/* ---- Outgoing ---- */
+async function createOffer() {
+  peerConnection = new RTCPeerConnection(rtcConfig);
+  addTracksAndListeners();
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  socket.emit('call_offer', {offer, type: callType});
+}
+
+/* ---- Incoming ---- */
+socket.on('incoming_call', async ({from, offer, type}) => {
+  peerUser = from;
+  callType = type;
+  isCaller = false;
+  pendingOffer = offer;
+  showCallOverlay(`Incoming ${type === 'video' ? 'Video' : 'Voice'} Call from ${from}`);
+  document.getElementById('incoming-controls').classList.remove('hidden');
+  document.getElementById('end-call').classList.add('hidden');
+});
+
+/* Accept button */
+document.getElementById('accept-call').onclick = async () => {
+  document.getElementById('incoming-controls').classList.add('hidden');
+  document.getElementById('end-call').classList.remove('hidden');
+  await initLocalStream(callType);
+  await handleIncomingOffer(pendingOffer);
+};
+
+/* Decline button */
+document.getElementById('decline-call').onclick = () => endCall(true);
+
+/* ---- Answer ---- */
+async function handleIncomingOffer(offer) {
+  peerConnection = new RTCPeerConnection(rtcConfig);
+  addTracksAndListeners();
   await peerConnection.setRemoteDescription(offer);
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
   socket.emit('call_answer', answer);
 }
 
-socket.on('call_answered', async (answer) => {
+/* ---- Answer received (caller side) ---- */
+socket.on('call_answered', async answer => {
   await peerConnection.setRemoteDescription(answer);
-  document.getElementById('call-status').textContent = 'Connected!';
+  document.getElementById('call-info').textContent = 'Connected!';
+  document.getElementById('end-call').classList.remove('hidden');
 });
 
-socket.on('new_ice_candidate', (candidate) => {
-  peerConnection.addIceCandidate(candidate);
-});
+/* ---- ICE ---- */
+socket.on('new_ice_candidate', cand => peerConnection?.addIceCandidate(cand));
 
-function endCall() {
-  socket.emit('end_call');
-  closeCall();
+/* ---- End call ---- */
+socket.on('call_ended', () => endCall());
+document.getElementById('end-call').onclick = () => endCall(true);
+
+/* Helper: add tracks + listeners */
+function addTracksAndListeners() {
+  localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+
+  peerConnection.onicecandidate = e => e.candidate && socket.emit('ice_candidate', e.candidate);
+  peerConnection.ontrack = e => {
+    document.getElementById('remote-video').srcObject = e.streams[0];
+  };
 }
 
-socket.on('call_ended', () => {
-  closeCall();
-});
-
-function closeCall() {
-  if (localStream) localStream.getTracks().forEach(track => track.stop());
+/* Show / hide overlay */
+let callType = null;
+function showCallOverlay(msg) {
+  document.getElementById('call-info').textContent = msg;
+  document.getElementById('call-overlay').classList.remove('hidden');
+}
+function endCall(send = false) {
+  if (send) socket.emit('end_call');
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
   if (peerConnection) peerConnection.close();
-  document.getElementById('local-video').srcObject = null;
-  document.getElementById('remote-video').srcObject = null;
+  localStream = peerConnection = null;
   document.getElementById('call-overlay').classList.add('hidden');
-  callType = null;
-  isCaller = false;
+  document.getElementById('incoming-controls').classList.add('hidden');
+  document.getElementById('end-call').classList.add('hidden');
 }
 
-// For voice-only: Hide video elements in CSS if callType === 'voice'
-if (callType === 'voice') {
-  document.getElementById('local-video').style.display = 'none';
-  document.getElementById('remote-video').style.display = 'none';
-}
+/* ================== BUTTON WIRING ================== */
+document.getElementById('voice-call').onclick = () => startCall('voice');
+document.getElementById('video-call').onclick = () => startCall('video');
