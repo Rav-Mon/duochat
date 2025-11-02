@@ -7,45 +7,57 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Login Overlay -->
+  <!-- ==== LOGIN ==== -->
   <div id="login-overlay" class="overlay">
     <div class="login-box">
-      <h2>Login</h2>
+      <h2>Choose your name</h2>
       <button onclick="login('mango1')">Mango1</button>
       <button onclick="login('mango2')">Mango2</button>
     </div>
   </div>
 
-  <!-- Main App -->
+  <!-- ==== MAIN APP ==== -->
   <div id="app" class="hidden">
     <header>
-      <img id="peer-pic" src="" alt="Peer Pic" class="profile-pic">
-      <h2 id="peer-name">Connecting...</h2>
+      <label for="peer-pic-upload" class="profile-label">
+        <img id="peer-pic" src="" alt="Peer" class="profile-pic">
+      </label>
+      <div class="peer-info">
+        <h2 id="peer-name">…</h2>
+        <span id="online-status" class="online-status"></span>
+      </div>
       <div class="call-buttons">
-        <button id="voice-call" onclick="startCall('voice')">📞 Voice</button>
-        <button id="video-call" onclick="startCall('video')">📹 Video</button>
+        <button id="voice-call" title="Voice Call">Phone</button>
+        <button id="video-call" title="Video Call">Video Camera</button>
       </div>
     </header>
 
-    <div id="messages" class="messages"></div>
+    <div id-="messages" class="messages"></div>
 
     <footer>
-      <input type="file" id="profile-upload" accept="image/*" style="display:none" onchange="uploadProfile()">
-      <button onclick="document.getElementById('profile-upload').click()">👤 Set Profile Pic</button>
-      <input type="text" id="message-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+      <input type="text" id="message-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMessage()">
       <button onclick="sendMessage()">Send</button>
     </footer>
   </div>
 
-  <!-- Call UI -->
+  <!-- ==== CALL OVERLAY (Incoming / Outgoing) ==== -->
   <div id="call-overlay" class="overlay hidden">
     <div class="call-box">
+      <div id="call-info">Calling…</div>
       <video id="local-video" autoplay muted playsinline></video>
       <video id="remote-video" autoplay playsinline></video>
-      <button id="end-call" onclick="endCall()">End Call</button>
-      <p id="call-status">Ringing...</p>
+
+      <div id="incoming-controls" class="hidden">
+        <button id="accept-call">Accept</button>
+        <button id="decline-call">Decline</button>
+      </div>
+
+      <button id="end-call" class="hidden">End Call</button>
     </div>
   </div>
+
+  <!-- hidden file input for peer picture (never shown) -->
+  <input type="file" id="peer-pic-upload" accept="image/*" style="display:none" onchange="uploadProfile(this.files[0])">
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
